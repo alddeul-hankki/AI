@@ -1,0 +1,77 @@
+from typing import Optional
+import pandas as pd
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from core.db import SessionLocal
+from services.snapshot_service import create_draft_run, warmup_to_redis, activate_run, fetch_cluster_rows
+from services.cluster_job import ClusterParams, run_clustering, to_cluster_member_rows
+
+def fetch_candidates(db: Session, campus_id: int) -> pd.DataFrame:
+    # 이 부분은 실제 데이터로 교체 권장 (slots 9개 int 생성)
+    def bits_to_slots(bitstr: str):
+        assert len(bitstr) == 288
+        slots = []
+        for blk in range(9):
+            val = 0
+            for i in range(32):
+                b = 1 if bitstr[blk*32 + i] == '1' else 0
+                val |= (b << i)
+            slots.append(val)
+        return slots
+
+    data = [
+        {"user_id": 9001, "lat": 37.50, "lng": 127.00, "slots": bits_to_slots("1"*288), "cat_korean":1, "cat_pizza":0},
+        {"user_id": 9002, "lat": 37.51, "lng": 127.01, "slots": bits_to_slots(("10"*144)), "cat_korean":1, "cat_pizza":0},
+        {"user_id": 9003, "lat": 37.49, "lng": 126.99, "slots": bits_to_slots(("01"*144)), "cat_korean":0, "cat_pizza":1},
+        {"user_id": 9004, "lat": 37.52, "lng": 127.02, "slots": bits_to_slots("0"*288), "cat_korean":0, "cat_pizza":1},
+        {"user_id": 9005, "lat": 37.505,"lng":127.005,"slots": bits_to_slots(("0"*144)+("1"*144)), "cat_korean":1,"cat_pizza":1},
+    ]
+    return pd.DataFrame(data)
+
+def bulk_insert_cluster_member(db: Session, rows):
+    db.execute(text("""
+        INSERT INTO cluster_member (run_id, cluster_seq, user_id, rank_in_cluster, distance_to_center)
+        VALUES (:run_id, :cluster_seq, :user_id, :rank_in_cluster, :distance_to_center)
+    """), rows)
+    db.commit()
+
+def run_full_cycle(campus_id: int, algo: str = "kmeans-v1", note: Optional[str] = None):
+    db = SessionLocal()
+    try:
+        # 1) 후보 로드
+        df = fetch_candidates(db, campus_id)
+        if df.empty:
+            raise RuntimeError("no candidates")
+
+        # 2) 파라미터(가중치/정책) 기록
+        params = ClusterParams(
+            min_group_size=3,
+            w_time=1.0, w_loc=0.8, w_cat=1.2,   # ← 초기 튜닝값 예시
+            downsample=6
+        )
+        param_json = {
+            "note": note,
+            "min_group_size": params.min_group_size,
+            "w_time": params.w_time,
+            "w_loc": params.w_loc,
+            "w_cat": params.w_cat,
+            "downsample": params.downsample
+        }
+
+        # 3) draft run
+        run_id = create_draft_run(db, campus_id, algo, param_json)
+
+        # 4) 클러스터링(+최소군집 재배정)
+        labels, dists, _X = run_clustering(df, params)
+        rows = to_cluster_member_rows(run_id, df, labels, dists)
+
+        # 5) 적재
+        bulk_insert_cluster_member(db, rows)
+
+        # 6) Redis 워밍업 + 활성화
+        warmup_to_redis(run_id, fetch_cluster_rows(db, run_id))
+        activate_run(db, campus_id, run_id)
+
+        return run_id
+    finally:
+        db.close()

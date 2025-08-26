@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pymysql
+apscheduler
+redis
+numpy
+pandas
+scikit-learn
+python-dotenv
