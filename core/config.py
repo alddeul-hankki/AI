@@ -30,7 +30,7 @@ class Settings(BaseModel):
     # Redis
     REDIS_HOST: str
     REDIS_PORT: int
-    REDIS_PASSWORD: str  # ← 추가 (필수)
+    REDIS_PASSWORD: str
 
     # 기타
     CAMPUS_ID: int

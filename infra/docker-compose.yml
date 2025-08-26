@@ -26,6 +26,8 @@ services:
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes", "--protected-mode", "yes"]
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped

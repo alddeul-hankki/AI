@@ -2,7 +2,12 @@ from fastapi import APIRouter, HTTPException, Query
 import redis
 from core.config import settings
 
-r = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True)
+r = redis.Redis(
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    password=settings.REDIS_PASSWORD,
+    decode_responses=True,
+)
 router = APIRouter(prefix="/campuses", tags=["clusters"])
 
 @router.get("/{campus_id}/clusters/me")

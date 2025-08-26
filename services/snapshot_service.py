@@ -6,7 +6,12 @@ import json
 from core.config import settings
 from core.db import SessionLocal
 
-r = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True)
+r = redis.Redis(
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    password=settings.REDIS_PASSWORD,
+    decode_responses=True,
+)
 
 def create_draft_run(db: Session, campus_id: int, algo: str, param_json: Optional[dict]) -> int:
     if param_json is None:
