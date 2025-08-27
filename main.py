@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from zoneinfo import ZoneInfo
 
 from api.routes import router as clusters_router
 from api.admin_routes import router as admin_router
@@ -18,7 +20,7 @@ app.include_router(admin_router)
 app.include_router(dirty_router)
 
 # 10분 오토사이클
-sched = BackgroundScheduler(timezone="Asia/Seoul")
+sched = BackgroundScheduler(timezone=ZoneInfo("Asia/Seoul"))
 
 def _auto_cycle_tick():
     # 1) 더티 있으면 재계산
@@ -31,8 +33,19 @@ def _auto_cycle_tick():
 
 @app.on_event("startup")
 def on_startup():
-    sched.add_job(_auto_cycle_tick, "interval", minutes=settings.AUTOCYCLE_EVERY_MIN)
+    # ⬇️ interval 대신 cron으로 교체 (정각 기준 10분 간격)
+    trigger = CronTrigger(minute="0,10,20,30,40,50")
+    sched.add_job(
+        _auto_cycle_tick,
+        trigger=trigger,
+        id="cluster_cycle",
+        replace_existing=True,
+        max_instances=1,       # 겹치기 방지: 이전 실행이 끝나지 않았으면 중복 실행 금지
+        coalesce=True,         # 지연된 여러 트리거를 한 번으로 합치기
+        misfire_grace_time=120 # 일시 장애 시 120초 내 보정 허용
+    )
     sched.start()
+
 
 @app.on_event("shutdown")
 def on_shutdown():
