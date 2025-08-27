@@ -46,28 +46,70 @@ class ClusterParams:
     n_init: int = 10
     force_k: Optional[int] = None
 
-def build_feature_matrix(df: pd.DataFrame, params: ClusterParams) -> Tuple[np.ndarray, List[int]]:
-    user_ids = df["user_id"].astype(int).tolist()
+def build_feature_matrix(candidates_df, w_loc: float = 1.0, w_pref: float = 1.0):
+    """
+    새 규칙:
+      - 위치: 우선 'latitude','longitude' 사용.
+              없으면 하위호환으로 'lat','lng'를 찾아 'latitude','longitude'로 매핑하여 사용.
+      - 선호도: 'user_id','latitude','longitude'를 제외한 나머지 수치형 컬럼 전체.
+               (cat_ 프리픽스 의존성 제거)
+      - 선호도는 각 행의 합이 1이 되도록 정규화(합이 0이면 균등분포).
+    반환:
+      X: [w_loc*lat, w_loc*lng, w_pref*pref...]로 이어붙인 행렬 (N x (2 + #pref))
+      pref_cols: 선호도에 사용된 컬럼 목록(학습/로깅용)
+    """
+    df = candidates_df.copy()
 
-    # 위치(필수)
-    loc_feats = df[["lat", "lng"]].to_numpy(dtype=np.float32)  # (N, 2)
+    # 1) 위치 컬럼 확보
+    has_latlon = all(c in df.columns for c in ("latitude", "longitude"))
+    has_legacy = all(c in df.columns for c in ("lat", "lng"))
+    if not has_latlon and has_legacy:
+        # 하위호환 매핑
+        df = df.rename(columns={"lat": "latitude", "lng": "longitude"})
+        has_latlon = True
 
-    # 카테고리(있으면)
-    cat_cols = [c for c in df.columns if c.startswith("cat_")]
-    cat_feats = df[cat_cols].to_numpy(dtype=np.float32) if cat_cols else None
+    loc = None
+    if has_latlon:
+        # 수치 변환 및 NaN 방지
+        loc = df[["latitude", "longitude"]].astype(float).to_numpy()
+    else:
+        # 위치가 전혀 없으면 0벡터로 대체(차원 유지가 필요없다면 None로 두고 제외 가능)
+        loc = np.zeros((len(df), 2), dtype=float)
 
-    # 스케일 + 가중치 (시간 피처 제거됨)
-    scaler_l = StandardScaler()
-    l = scaler_l.fit_transform(loc_feats) * params.w_loc
+    # 2) 선호도 컬럼: user_id/latitude/longitude 제외한 수치형
+    exclude = {"user_id", "latitude", "longitude"}
+    numeric_cols = [c for c in df.columns if c not in exclude]
+    # 수치형만 추려내기 (문자형 섞인 경우를 대비)
+    pref_candidates = []
+    for c in numeric_cols:
+        try:
+            df[c] = df[c].astype(float)
+            pref_candidates.append(c)
+        except Exception:
+            # 숫자로 변환 안 되면 선호도에서 제외
+            continue
 
-    feats = [l]
-    if cat_feats is not None:
-        scaler_c = StandardScaler()
-        c = scaler_c.fit_transform(cat_feats) * params.w_cat
-        feats.append(c)
+    pref_cols = pref_candidates
+    if pref_cols:
+        pref = df[pref_cols].to_numpy(dtype=float)
+        # 3) 행 정규화(합=1), 합이 0이면 균등분포
+        row_sums = pref.sum(axis=1, keepdims=True)
+        zeros = (row_sums == 0.0)
+        row_sums[zeros] = 1.0
+        pref = pref / row_sums
+        if zeros.any():
+            # 균등 분포 대치
+            k = pref.shape[1]
+            pref[zeros.ravel(), :] = 1.0 / k
+    else:
+        # 선호도 컬럼이 전혀 없다면 0차원으로 둠
+        pref = np.empty((len(df), 0), dtype=float)
 
-    X = np.hstack(feats).astype(np.float32)
-    return X, user_ids
+    # 4) 가중치 적용 및 결합
+    X_loc = w_loc * loc
+    X_pref = w_pref * pref
+    X = np.hstack([X_loc, X_pref])
+    return X, pref_cols
 
 
 # def choose_k(n: int, params: ClusterParams) -> int:

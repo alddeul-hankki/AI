@@ -22,16 +22,16 @@ def fetch_candidates(db: Session, campus_id: int) -> pd.DataFrame:
         return slots
 
     data = [
-        {"user_id": 9001, "lat": 37.50, "lng": 127.00, "slots": bits_to_slots("1"*288),            "cat_korean":0.5, "cat_pizza":0.2, "cat_chicken":0.3}, #1
-        {"user_id": 9002, "lat": 37.51, "lng": 127.01, "slots": bits_to_slots(("10"*144)),         "cat_korean":1, "cat_pizza":0, "cat_chicken":0}, #2
-        {"user_id": 9003, "lat": 37.49, "lng": 126.99, "slots": bits_to_slots(("01"*144)),         "cat_korean":0, "cat_pizza":1, "cat_chicken":0}, #3
-        {"user_id": 9004, "lat": 37.52, "lng": 127.02, "slots": bits_to_slots("0"*288),            "cat_korean":0, "cat_pizza":1, "cat_chicken":0}, #4
-        {"user_id": 9005, "lat": 37.505,"lng":127.005,"slots": bits_to_slots(("0"*144)+("1"*144)), "cat_korean":1,"cat_pizza":0, "cat_chicken":0}, #5
-        {"user_id": 9006, "lat": 37.52, "lng": 127.02, "slots": bits_to_slots("110"*96),           "cat_korean":1, "cat_pizza":0, "cat_chicken":0}, #6
-        {"user_id": 9007, "lat": 37.51, "lng": 127.01, "slots": bits_to_slots(("10"*144)),         "cat_korean":0.6, "cat_pizza":0, "cat_chicken":0.4}, #7
-        {"user_id": 9008, "lat": 37.49, "lng": 126.99, "slots": bits_to_slots(("01"*144)),         "cat_korean":0, "cat_pizza":0.3, "cat_chicken":0.7}, #8
-        {"user_id": 9009, "lat": 37.50, "lng": 127.00, "slots": bits_to_slots("0"*288),            "cat_korean":0, "cat_pizza":0.3, "cat_chicken":0.7}, #9
-        {"user_id": 9010, "lat": 37.505,"lng":127.005,"slots": bits_to_slots(("0"*144)+("1"*144)), "cat_korean":0.9,"cat_pizza":0.1, "cat_chicken":0}, #10
+        {"user_id": 9001, "latitude": 37.50, "longitude": 127.00, "korean":0.5, "pizza":0.2, "chicken":0.3}, #1
+        {"user_id": 9002, "latitude": 37.51, "longitude": 127.01, "korean":1, "pizza":0, "chicken":0}, #2
+        {"user_id": 9003, "latitude": 37.49, "longitude": 126.99, "korean":0, "pizza":1, "chicken":0}, #3
+        {"user_id": 9004, "latitude": 37.52, "longitude": 127.02, "korean":0, "pizza":1, "chicken":0}, #4
+        {"user_id": 9005, "latitude": 37.505,"longitude":127.005, "korean":1,"pizza":0, "chicken":0}, #5
+        {"user_id": 9006, "latitude": 37.52, "longitude": 127.02, "korean":1, "pizza":0, "chicken":0}, #6
+        {"user_id": 9007, "latitude": 37.51, "longitude": 127.01, "korean":0.6, "pizza":0, "chicken":0.4}, #7
+        {"user_id": 9008, "latitude": 37.49, "longitude": 126.99, "korean":0, "pizza":0.3, "chicken":0.7}, #8
+        {"user_id": 9009, "latitude": 37.50, "longitude": 127.00, "korean":0, "pizza":0.3, "chicken":0.7}, #9
+        {"user_id": 9010, "latitude": 37.505,"longitude":127.005, "korean":0.9,"pizza":0.1, "chicken":0}, #10
     ]
     return pd.DataFrame(data)
 
