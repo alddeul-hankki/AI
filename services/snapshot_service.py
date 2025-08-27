@@ -76,7 +76,8 @@ def warmup_to_redis(run_id: int, rows: Iterable[Tuple[int,int,Optional[int],Opti
         pipe.execute()
 
 def activate_run(db: Session, campus_id: int, run_id: int) -> None:
-    # 별도 begin 컨텍스트 없이 수행 → 마지막에 commit
+    # 트랜잭션 시작 (Session이 autocommit=False 가정)
+    # 1) 대상 run 잠금 및 상태 확인
     status = db.execute(
         text("SELECT status FROM run WHERE run_id = :rid FOR UPDATE"),
         {"rid": run_id}
@@ -85,10 +86,23 @@ def activate_run(db: Session, campus_id: int, run_id: int) -> None:
     if status not in ("draft", "active"):
         raise ValueError(f"invalid status for activation: {status}")
 
+    # 2) 같은 캠퍼스의 기존 active 모두 내리기
+    db.execute(
+        text("""
+        UPDATE run
+        SET status = 'draft'
+        WHERE campus_id = :cid AND status = 'active' AND run_id <> :rid
+        """),
+        {"cid": campus_id, "rid": run_id}
+    )
+
+    # 3) 대상 run 활성화
     db.execute(
         text("UPDATE run SET status='active', activated_at=NOW() WHERE run_id=:rid"),
         {"rid": run_id}
     )
+
+    # 4) campus_latest 갱신
     db.execute(
         text("""
         INSERT INTO campus_latest (campus_id, active_run_id)
@@ -99,9 +113,10 @@ def activate_run(db: Session, campus_id: int, run_id: int) -> None:
         """),
         {"cid": campus_id, "rid": run_id}
     )
-    db.commit()  # ← 여기서 커밋
 
-    # DB 커밋 후 Redis 스위치
+    db.commit()
+
+    # 5) 커밋 후 Redis 스위치
     r.set(f"active:campus:{campus_id}", f"run:{run_id}")
     
 def run_stats(db: Session, run_id: int) -> dict:
