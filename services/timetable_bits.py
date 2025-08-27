@@ -86,27 +86,3 @@ def from_nine_ints(nine: List[int]) -> List[int]:
                 if i < SLOTS_PER_DAY:
                     bits[i] = 1
     return bits
-
-
-# # 간단 실행 예시
-# if __name__ == "__main__":
-#     rows = [
-#         Row(0, time(9, 0),  time(10, 30)),  # 월 09:00-10:30
-#         Row(0, time(13, 0), time(14, 15)),  # 월 13:00-14:15
-#         Row(2, time(9, 3),  time(9, 27))    # 수 09:03-09:27 -> 09:00-09:30
-#     ]
-
-#     per_day = build_bits_per_day(rows)
-
-#     mon_bits = per_day[0]
-#     mon_ints = to_nine_ints(mon_bits)
-
-#     print("월요일 int[9]:", mon_ints)
-#     count = 0
-#     for mon_bit in mon_bits:
-#         if mon_bit==1:
-#             count+=1
-#     print(count)
-
-#     wed_bits = per_day[2]
-#     print("수요일 9:00~9:30 마킹 여부:", wed_bits[108:114])  # 09:00 슬롯=108
