@@ -39,7 +39,7 @@ class ClusterParams:
     min_group_size: int = 3
     w_time: float = 1.0
     w_loc: float = 0.5
-    w_cat: float = 1.5
+    w_pref: float = 1.5
     downsample: int = 6
     computed_k: int = 0
     random_state: int = 42
@@ -125,7 +125,7 @@ def run_clustering(df: pd.DataFrame, params: ClusterParams) -> Tuple[np.ndarray,
       dists:  (N,) 최종 중심거리
       X:      (N,D) 표준화 특징 (사후 재배정용)
     """
-    X, _ = build_feature_matrix(df, params)
+    X, _ = build_feature_matrix(df, params.w_loc, params.w_pref)
     n = len(df)
 
     min_group_size = int(getattr(params, "min_group_size", 6))

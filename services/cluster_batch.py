@@ -75,13 +75,13 @@ def run_full_cycle(campus_id: int, algo: str = "kmeans-v1", note: Optional[str] 
             raise RuntimeError("no candidates after meal-window filter")
 
         # 2) 파라미터 기록
-        params = ClusterParams(min_group_size=3, w_time=1.0, w_loc=0.5, w_cat=1.5, downsample=6)
+        params = ClusterParams(min_group_size=3, w_time=1.0, w_loc=0.5, w_pref=1.5, downsample=6)
         param_json = {
             "note": note,
             "min_group_size": params.min_group_size,
             "w_time": params.w_time,
             "w_loc": params.w_loc,
-            "w_cat": params.w_cat,
+            "w_pref": params.w_pref,
             "downsample": params.downsample,
             "cycle_anchor": ref_time.isoformat()
         }
