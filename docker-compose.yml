@@ -1,0 +1,41 @@
+services:
+  api:
+    image: solmeal-api:latest
+    restart: unless-stopped
+    env_file: .env
+    ports: ["80:8000"]
+    depends_on: [mysql, redis]
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    # ✅ mysqld는 쓰지 말고 옵션만!
+    command: --innodb-buffer-pool-size=256M --innodb-log-file-size=64M --max-connections=100 --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./infra/mysql/init:/docker-entrypoint-initdb.d:ro   # ✅ init 자동실행 경로
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: [
+      "redis-server",
+      "--requirepass","${REDIS_PASSWORD}",
+      "--bind","0.0.0.0",
+      "--protected-mode","yes",
+      "--appendonly","no",
+      "--save","",
+      "--maxmemory","${REDIS_MAXMEM}",
+      "--maxmemory-policy","allkeys-lfu"
+    ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_MAXMEM: ${REDIS_MAXMEM}
+
+volumes:
+  mysql-data:
