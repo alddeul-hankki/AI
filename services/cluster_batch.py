@@ -4,10 +4,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from core.db import SessionLocal
 from services.snapshot_service import create_draft_run, warmup_to_redis, activate_run, fetch_cluster_rows
-from services.cluster_job import ClusterParams, run_clustering, to_cluster_member_rows
+from services.cluster_job import ClusterParams, run_clustering, to_cluster_member_rows, compute_k
 
 def fetch_candidates(db: Session, campus_id: int) -> pd.DataFrame:
-    # 이 부분은 실제 데이터로 교체 권장 (slots 9개 int 생성)
+    # TODO: 이 부분은 실제 데이터로 교체 권장 (slots 9개 int 생성)
     def bits_to_slots(bitstr: str):
         assert len(bitstr) == 288
         slots = []
@@ -20,11 +20,16 @@ def fetch_candidates(db: Session, campus_id: int) -> pd.DataFrame:
         return slots
 
     data = [
-        {"user_id": 9001, "lat": 37.50, "lng": 127.00, "slots": bits_to_slots("1"*288), "cat_korean":1, "cat_pizza":0},
-        {"user_id": 9002, "lat": 37.51, "lng": 127.01, "slots": bits_to_slots(("10"*144)), "cat_korean":1, "cat_pizza":0},
-        {"user_id": 9003, "lat": 37.49, "lng": 126.99, "slots": bits_to_slots(("01"*144)), "cat_korean":0, "cat_pizza":1},
-        {"user_id": 9004, "lat": 37.52, "lng": 127.02, "slots": bits_to_slots("0"*288), "cat_korean":0, "cat_pizza":1},
-        {"user_id": 9005, "lat": 37.505,"lng":127.005,"slots": bits_to_slots(("0"*144)+("1"*144)), "cat_korean":1,"cat_pizza":1},
+        {"user_id": 9001, "lat": 37.50, "lng": 127.00, "slots": bits_to_slots("1"*288),            "cat_korean":0.5, "cat_pizza":0.2, "cat_chicken":0.3}, #1
+        {"user_id": 9002, "lat": 37.51, "lng": 127.01, "slots": bits_to_slots(("10"*144)),         "cat_korean":1, "cat_pizza":0, "cat_chicken":0}, #2
+        {"user_id": 9003, "lat": 37.49, "lng": 126.99, "slots": bits_to_slots(("01"*144)),         "cat_korean":0, "cat_pizza":1, "cat_chicken":0}, #3
+        {"user_id": 9004, "lat": 37.52, "lng": 127.02, "slots": bits_to_slots("0"*288),            "cat_korean":0, "cat_pizza":1, "cat_chicken":0}, #4
+        {"user_id": 9005, "lat": 37.505,"lng":127.005,"slots": bits_to_slots(("0"*144)+("1"*144)), "cat_korean":1,"cat_pizza":0, "cat_chicken":0}, #5
+        {"user_id": 9006, "lat": 37.52, "lng": 127.02, "slots": bits_to_slots("110"*96),           "cat_korean":1, "cat_pizza":0, "cat_chicken":0}, #6
+        {"user_id": 9007, "lat": 37.51, "lng": 127.01, "slots": bits_to_slots(("10"*144)),         "cat_korean":0.6, "cat_pizza":0, "cat_chicken":0.4}, #7
+        {"user_id": 9008, "lat": 37.49, "lng": 126.99, "slots": bits_to_slots(("01"*144)),         "cat_korean":0, "cat_pizza":0.3, "cat_chicken":0.7}, #8
+        {"user_id": 9009, "lat": 37.50, "lng": 127.00, "slots": bits_to_slots("0"*288),            "cat_korean":0, "cat_pizza":0.3, "cat_chicken":0.7}, #9
+        {"user_id": 9010, "lat": 37.505,"lng":127.005,"slots": bits_to_slots(("0"*144)+("1"*144)), "cat_korean":0.9,"cat_pizza":0.1, "cat_chicken":0}, #10
     ]
     return pd.DataFrame(data)
 
@@ -46,7 +51,7 @@ def run_full_cycle(campus_id: int, algo: str = "kmeans-v1", note: Optional[str] 
         # 2) 파라미터(가중치/정책) 기록
         params = ClusterParams(
             min_group_size=3,
-            w_time=1.0, w_loc=0.8, w_cat=1.2,   # ← 초기 튜닝값 예시
+            w_time=1.0, w_loc=0.5, w_cat=1.5,   # ← 초기 튜닝값 예시
             downsample=6
         )
         param_json = {
@@ -60,6 +65,21 @@ def run_full_cycle(campus_id: int, algo: str = "kmeans-v1", note: Optional[str] 
 
         # 3) draft run
         run_id = create_draft_run(db, campus_id, algo, param_json)
+
+        # 3.5) ✨ k 계산·기록·전달 (핵심)
+        n = len(df)
+        k = compute_k(n, params.min_group_size, k_min=2)
+
+        # run.param_json에 computed_k 저장 (디버깅/추적용)
+        db.execute(text("""
+          UPDATE run
+          SET param_json = JSON_SET(param_json, '$.computed_k', :k)
+          WHERE run_id = :rid
+        """), {"k": int(k), "rid": run_id})
+        db.commit()
+
+        # 실제 실행 파라미터로 강제 주입
+        params.force_k = int(k)
 
         # 4) 클러스터링(+최소군집 재배정)
         labels, dists, _X = run_clustering(df, params)
