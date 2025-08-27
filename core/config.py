@@ -34,7 +34,6 @@ class Settings(BaseModel):
 
     # 기타
     CAMPUS_ID: int
-    AUTOCYCLE_EVERY_MIN: int
 
 # ⚠️ 기존 변수명/사용 패턴(settings.MYSQL_HOST 등) 유지
 settings = Settings(
@@ -52,5 +51,4 @@ settings = Settings(
 
     # 기타 (운영 로직상 필수)
     CAMPUS_ID=_require_int("CAMPUS_ID"),
-    AUTOCYCLE_EVERY_MIN=_require_int("AUTOCYCLE_EVERY_MIN"),
 )
