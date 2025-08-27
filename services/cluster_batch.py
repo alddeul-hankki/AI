@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from core.db import SessionLocal
 from services.snapshot_service import create_draft_run, warmup_to_redis, activate_run, fetch_cluster_rows
 from services.cluster_job import ClusterParams, run_clustering, to_cluster_member_rows, compute_k
+from services.timetable_service import _today_dow_kst, fetch_slots_for_users, has_meal_window_twoday
 
 def fetch_candidates(db: Session, campus_id: int) -> pd.DataFrame:
     # TODO: 이 부분은 실제 데이터로 교체 권장 (slots 9개 int 생성)
@@ -45,6 +46,25 @@ def run_full_cycle(campus_id: int, algo: str = "kmeans-v1", note: Optional[str] 
     try:
         # 1) 후보 로드
         df = fetch_candidates(db, campus_id)
+        user_ids = df["user_id"].astype(int).tolist()
+        dow_today = _today_dow_kst()
+        dow_next = (dow_today + 1) % 7
+
+        slots_today = fetch_slots_for_users(db, user_ids, dow_today)
+        slots_next  = fetch_slots_for_users(db, user_ids, dow_next)
+
+        def _ok(uid: int, s_today: list[int] | None) -> bool:
+            if not s_today:
+                return False  # 슬롯 없으면 제외
+            s_next = slots_next.get(uid)  # 없으면 None
+            return has_meal_window_twoday(
+                s_today, s_next,
+                lookahead_min=30,  # 설정값으로 빼도 됨
+                need_min=30,
+                empty_is=0          # 환경에 따라 0/1 맞추세요
+            )
+
+        df = df[df["user_id"].astype(int).apply(lambda uid: _ok(uid, slots_today.get(uid)))]
         if df.empty:
             raise RuntimeError("no candidates")
 
