@@ -18,6 +18,19 @@ def _require_int(key: str) -> int:
         return int(v)
     except ValueError:
         raise RuntimeError(f"Invalid integer for {key}: {v}")
+    
+def _optional_str(key: str, default: str = "") -> str:
+    v = os.getenv(key)
+    return v if (v is not None and v.strip() != "") else default
+
+def _optional_int(key: str, default: int) -> int:
+    v = os.getenv(key)
+    if v is None or v.strip() == "":
+        return default
+    try:
+        return int(v)
+    except ValueError:
+        raise RuntimeError(f"Invalid integer for {key}: {v}")
 
 class Settings(BaseModel):
     # MySQL
@@ -35,6 +48,11 @@ class Settings(BaseModel):
     # 기타
     CAMPUS_ID: int
 
+    #backend
+    BACKEND_API_BASE: str
+    BACKEND_API_KEY: str = ""
+    BACKEND_TIMEOUT: int = 5
+
 # ⚠️ 기존 변수명/사용 패턴(settings.MYSQL_HOST 등) 유지
 settings = Settings(
     # MySQL (모두 필수)
@@ -51,4 +69,9 @@ settings = Settings(
 
     # 기타 (운영 로직상 필수)
     CAMPUS_ID=_require_int("CAMPUS_ID"),
+
+    #backend
+    BACKEND_API_BASE=_require_str("BACKEND_API_BASE"),
+    BACKEND_API_KEY=_optional_str("BACKEND_API_KEY", ""),
+    BACKEND_TIMEOUT=_optional_int("BACKEND_TIMEOUT", 5),
 )
