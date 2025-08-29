@@ -22,7 +22,7 @@ class ClusterRequest(BaseModel):
     userId: int
     topK: int = 5   # 기본값 5, 유효범위는 1~100으로 검증할 수도 있음
 
-@router.post("/clusters")
+@router.post("/cluster-member/me")
 def my_cluster_post(payload: ClusterRequest = Body(...)):
     campus_id = payload.campusId
     user_id = payload.userId
@@ -60,5 +60,6 @@ def my_cluster_post(payload: ClusterRequest = Body(...)):
         members = members[:top_k]
 
     return {
-        "members": [{"userId": uid} for uid in members]
+            "groupId": _group_id,
+            "members": [{"userId": uid} for uid in members],
     }
