@@ -172,3 +172,35 @@ def post_users_locations(
         if not all(k in item for k in ("userId", "longitude", "latitude")):
             raise ValueError("Invalid response item shape")
     return data
+
+PREF_KEY_MAP = {
+    "한식": "korean",
+    "피자": "pizza",
+    "치킨": "chicken",
+}
+def fetch_user_preferences(user_ids: List[int], timeout_sec: int = 10) -> pd.DataFrame:
+    """
+    주어진 user_ids를 backend API(/sol/api/analytics/user-preferences)로 전송하여
+    preferences 응답을 {user_id, korean, pizza, chicken} DataFrame으로 반환한다.
+    """
+    if not user_ids:
+        return pd.DataFrame(columns=["user_id"] + list(PREF_KEY_MAP.values()))
+
+    url = f"{settings.BACKEND_API_BASE}/sol/api/analytics/user-preferences"
+    payload = {"userIds": user_ids}
+
+    resp = requests.post(url, json=payload, timeout=timeout_sec)
+    resp.raise_for_status()
+    data = resp.json()
+
+    records: List[Dict] = []
+    for item in data:
+        uid = int(item["userId"])
+        prefs = item.get("preferences", {})
+        record = {"user_id": uid}
+        for k_src, k_dst in PREF_KEY_MAP.items():
+            record[k_dst] = float(prefs.get(k_src, 0.0))
+        records.append(record)
+
+    df = pd.DataFrame(records)
+    return df

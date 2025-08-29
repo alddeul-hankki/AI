@@ -3,27 +3,39 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from core.db import SessionLocal
-from services.backend_client import post_users_locations
+from services.backend_client import fetch_user_preferences, post_users_locations
 from services.data_util import normalize_user_id
 from services.snapshot_service import create_draft_run, warmup_to_redis, activate_run, fetch_cluster_rows
 from services.cluster_job import ClusterParams, run_clustering, to_cluster_member_rows, compute_k
 from services.timetable_service import anchor_to_10min_kst
 from typing import List, Dict
+from core.config import settings
+import requests
+import logging
 
 def fetch_candidates() -> pd.DataFrame:
-    data = [
-        {"user_id": 1, "korean":0.5, "pizza":0.2, "chicken":0.3}, #1
-        {"user_id": 22, "korean":0.6, "pizza":0, "chicken":0.4}, #2
-        {"user_id": 23, "korean":0, "pizza":1, "chicken":0}, #3
-        {"user_id": 24, "korean":0, "pizza":1, "chicken":0}, #4
-        {"user_id": 25, "korean":1,"pizza":0, "chicken":0}, #5
-        {"user_id": 26, "korean":1, "pizza":0, "chicken":0}, #6
-        {"user_id": 27, "korean":1, "pizza":0, "chicken":0}, #7
-        {"user_id": 28, "korean":0.9,"pizza":0.1, "chicken":0}, #8
-        {"user_id": 29, "korean":0, "pizza":0.3, "chicken":0.7}, #9
-        {"user_id": 30, "korean":0, "pizza":0.3, "chicken":0.7}, #10
-    ]
-    return pd.DataFrame(data)
+    """
+    1) timetable_bit에서 user_id 모두 가져오기
+    2) backend API 호출 (userIds 리스트 POST)
+    3) 응답 preferences를 {korean,pizza,chicken} 컬럼으로 매핑
+    4) pandas.DataFrame 반환
+    """
+    db = SessionLocal()
+    try:
+        # 1) 모든 user_id 가져오기
+        sql = text("SELECT DISTINCT user_id FROM timetable_bit")
+        rows = db.execute(sql).fetchall()
+        user_ids = [int(r[0]) for r in rows]
+    finally:
+        db.close()
+
+    if not user_ids:
+        return pd.DataFrame(columns=["user_id", "korean", "pizza", "chicken"])
+
+    # 4) DataFrame
+    df = fetch_user_preferences(user_ids)
+    
+    return df
 
 def bulk_insert_cluster_member(db: Session, rows):
     db.execute(text("""
