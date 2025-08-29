@@ -23,15 +23,15 @@ def fetch_candidates(db: Session, campus_id: int) -> pd.DataFrame:
 
     data = [
         {"user_id": 1, "latitude": 37.50, "longitude": 127.00, "korean":0.5, "pizza":0.2, "chicken":0.3}, #1
-        {"user_id": 2, "latitude": 37.51, "longitude": 127.01, "korean":1, "pizza":0, "chicken":0}, #2
+        {"user_id": 2, "latitude": 37.51, "longitude": 127.01, "korean":0.6, "pizza":0, "chicken":0.4}, #2
         {"user_id": 3, "latitude": 37.49, "longitude": 126.99, "korean":0, "pizza":1, "chicken":0}, #3
         {"user_id": 4, "latitude": 37.52, "longitude": 127.02, "korean":0, "pizza":1, "chicken":0}, #4
         {"user_id": 5, "latitude": 37.505,"longitude":127.005, "korean":1,"pizza":0, "chicken":0}, #5
         {"user_id": 6, "latitude": 37.52, "longitude": 127.02, "korean":1, "pizza":0, "chicken":0}, #6
-        {"user_id": 7, "latitude": 37.51, "longitude": 127.01, "korean":0.6, "pizza":0, "chicken":0.4}, #7
-        {"user_id": 8, "latitude": 37.49, "longitude": 126.99, "korean":0, "pizza":0.3, "chicken":0.7}, #8
-        {"user_id": 9, "latitude": 37.50, "longitude": 127.00, "korean":0, "pizza":0.3, "chicken":0.7}, #9
-        {"user_id": 10, "latitude": 37.505,"longitude":127.005, "korean":0.9,"pizza":0.1, "chicken":0}, #10
+        {"user_id": 7, "latitude": 37.51, "longitude": 127.01, "korean":1, "pizza":0, "chicken":0}, #7
+        {"user_id": 8, "latitude": 37.505,"longitude":127.005, "korean":0.9,"pizza":0.1, "chicken":0}, #8
+        {"user_id": 9, "latitude": 37.49, "longitude": 126.99, "korean":0, "pizza":0.3, "chicken":0.7}, #9
+        {"user_id": 10, "latitude": 37.50, "longitude": 127.00, "korean":0, "pizza":0.3, "chicken":0.7}, #10
     ]
     return pd.DataFrame(data)
 

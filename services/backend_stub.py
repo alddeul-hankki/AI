@@ -1,20 +1,5 @@
 from typing import List, Dict
 
-def get_intervals_bulk(user_ids: List[int]) -> Dict[int, Dict[int, list]]:
-    # TODO: 실제 백엔드로 교체
-    # 기대: 
-    # {  
-    #     9001: [
-    #         {"day_of_week": 0, "start": "09:00", "end": "10:30"},
-    #         {"day_of_week": 2, "start": "13:00", "end": "15:00"}
-    #     ],
-    #     9002: [
-    #         {"day_of_week": 1, "start": "10:00", "end": "11:30"}
-    #     ],
-    #     ...
-    # }
-    return {}
-
 def get_user_preferences(user_ids: List[int]) -> Dict[int, Dict[str, float]]:
     # TODO: 실제 백엔드로 교체
     # 기대:
