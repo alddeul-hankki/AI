@@ -3,23 +3,25 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from core.db import SessionLocal
+from services.backend_client import post_users_locations
+from services.data_util import normalize_user_id
 from services.snapshot_service import create_draft_run, warmup_to_redis, activate_run, fetch_cluster_rows
 from services.cluster_job import ClusterParams, run_clustering, to_cluster_member_rows, compute_k
-from datetime import datetime
-from services.timetable_service import _today_dow_kst, fetch_slots_for_users, has_meal_window_twoday, anchor_to_10min_kst
+from services.timetable_service import anchor_to_10min_kst
+from typing import List, Dict
 
 def fetch_candidates() -> pd.DataFrame:
     data = [
-        {"user_id": 1, "latitude": 37.50, "longitude": 127.00, "korean":0.5, "pizza":0.2, "chicken":0.3}, #1
-        {"user_id": 22, "latitude": 37.51, "longitude": 127.01, "korean":0.6, "pizza":0, "chicken":0.4}, #2
-        {"user_id": 23, "latitude": 37.49, "longitude": 126.99, "korean":0, "pizza":1, "chicken":0}, #3
-        {"user_id": 24, "latitude": 37.52, "longitude": 127.02, "korean":0, "pizza":1, "chicken":0}, #4
-        {"user_id": 25, "latitude": 37.505,"longitude":127.005, "korean":1,"pizza":0, "chicken":0}, #5
-        {"user_id": 26, "latitude": 37.52, "longitude": 127.02, "korean":1, "pizza":0, "chicken":0}, #6
-        {"user_id": 27, "latitude": 37.51, "longitude": 127.01, "korean":1, "pizza":0, "chicken":0}, #7
-        {"user_id": 28, "latitude": 37.505,"longitude":127.005, "korean":0.9,"pizza":0.1, "chicken":0}, #8
-        {"user_id": 29, "latitude": 37.49, "longitude": 126.99, "korean":0, "pizza":0.3, "chicken":0.7}, #9
-        {"user_id": 30, "latitude": 37.50, "longitude": 127.00, "korean":0, "pizza":0.3, "chicken":0.7}, #10
+        {"user_id": 1, "korean":0.5, "pizza":0.2, "chicken":0.3}, #1
+        {"user_id": 22, "korean":0.6, "pizza":0, "chicken":0.4}, #2
+        {"user_id": 23, "korean":0, "pizza":1, "chicken":0}, #3
+        {"user_id": 24, "korean":0, "pizza":1, "chicken":0}, #4
+        {"user_id": 25, "korean":1,"pizza":0, "chicken":0}, #5
+        {"user_id": 26, "korean":1, "pizza":0, "chicken":0}, #6
+        {"user_id": 27, "korean":1, "pizza":0, "chicken":0}, #7
+        {"user_id": 28, "korean":0.9,"pizza":0.1, "chicken":0}, #8
+        {"user_id": 29, "korean":0, "pizza":0.3, "chicken":0.7}, #9
+        {"user_id": 30, "korean":0, "pizza":0.3, "chicken":0.7}, #10
     ]
     return pd.DataFrame(data)
 
@@ -30,37 +32,42 @@ def bulk_insert_cluster_member(db: Session, rows):
     """), rows)
     db.commit()
 
+def enrich_df_with_locations(df_candidates: pd.DataFrame, locations: List[Dict]) -> pd.DataFrame:
+    """
+    locations를 df에 붙여 (user_id, longitude, latitude, 기존 선호도 feature들) 형태로 만든다.
+    """
+    if df_candidates.empty or not locations:
+        # 빈 결과를 안전하게 반환
+        cols = list(df_candidates.columns)
+        if "longitude" not in cols: cols.append("longitude")
+        if "latitude" not in cols: cols.append("latitude")
+        return pd.DataFrame(columns=cols)
+
+    df_candidates = normalize_user_id(df_candidates)  # ← 보장
+    loc_df = pd.DataFrame(locations).rename(columns={"userId": "user_id"})
+    # 혹시 응답이 숫자 문자열이면 안전 캐스팅
+    loc_df["user_id"] = loc_df["user_id"].astype(int)
+
+    merged = df_candidates.merge(loc_df, on="user_id", how="inner")
+    return merged
+
 def run_full_cycle(campus_id: int, algo: str = "kmeans-v1", note: Optional[str] = None):
     db = SessionLocal()
     try:
         # 1) 후보 로드
         df = fetch_candidates()
-        user_ids = df["user_id"].astype(int).tolist()
+        df = normalize_user_id(df)
 
         # ✨ 앵커 시간: '정각 기준 10분'으로
         ref_time = anchor_to_10min_kst()
 
-        dow_today = ref_time.weekday()               # 앵커 기준 요일
-        dow_next  = (dow_today + 1) % 7
+        locations = post_users_locations(db, df, ref_time)
 
-        slots_today = fetch_slots_for_users(db, user_ids, dow_today)
-        slots_next  = fetch_slots_for_users(db, user_ids, dow_next)
+        # ⑤ 위치를 df에 붙여: (user_id, longitude, latitude, 선호도 feature들)
+        df = enrich_df_with_locations(df, locations)
 
-        def _ok(uid: int, s_today: list[int] | None) -> bool:
-            if not s_today:
-                return False
-            s_next = slots_next.get(uid)
-            return has_meal_window_twoday(
-                s_today, s_next,
-                lookahead_min=120,
-                need_min=30,
-                empty_is=0,                 # ← 바쁨=1, 공강=0 환경이면 0으로 설정
-                ref_time=ref_time           # ✅ 'now' 대신 앵커 시간 사용
-            )
-
-        df = df[df["user_id"].astype(int).apply(lambda uid: _ok(uid, slots_today.get(uid)))]
         if df.empty:
-            raise RuntimeError("no candidates after meal-window filter")
+            raise RuntimeError("no candidates after location merge")
 
         # 2) 파라미터 기록
         params = ClusterParams(min_group_size=3, w_time=1.0, w_loc=0.5, w_pref=1.5, downsample=6)
