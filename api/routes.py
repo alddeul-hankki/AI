@@ -60,5 +60,5 @@ def my_cluster_post(payload: ClusterRequest = Body(...)):
 
     return {
             "groupId": _group_id,
-            "members": [{"userId": uid} for uid in members],
+            "userIds": [uid for uid in members],
     }
