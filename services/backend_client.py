@@ -160,7 +160,7 @@ def post_users_locations(
         return []  # 호출부에서 빈 df 처리
 
     # 2) POST 호출
-    url = f"http://192.168.12.92:8080/api/timetable/users/locations"
+    url = f"{settings.BACKEND_API_BASE}/api/timetable/users/locations"
     resp = requests.post(url, json=payload, timeout=timeout_sec)
     resp.raise_for_status()
     data = resp.json()
