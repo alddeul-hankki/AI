@@ -17,14 +17,13 @@ from pydantic import BaseModel
 from fastapi import Body
 
 class ClusterRequest(BaseModel):
-    campusId: int
     groupId: int  # 일단 받기만 함 (미사용)
     userId: int
     topK: int = 5   # 기본값 5, 유효범위는 1~100으로 검증할 수도 있음
 
 @router.post("/cluster-member/me")
 def my_cluster_post(payload: ClusterRequest = Body(...)):
-    campus_id = payload.campusId
+    campus_id = settings.CAMPUS_ID
     user_id = payload.userId
     _group_id = payload.groupId  # 나중에 사용 예정(현재 미사용)
     top_k = payload.topK
