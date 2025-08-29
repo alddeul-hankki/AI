@@ -9,18 +9,6 @@ from datetime import datetime
 from services.timetable_service import _today_dow_kst, fetch_slots_for_users, has_meal_window_twoday, anchor_to_10min_kst
 
 def fetch_candidates(db: Session, campus_id: int) -> pd.DataFrame:
-    # TODO: 이 부분은 실제 데이터로 교체 권장 (slots 9개 int 생성)
-    def bits_to_slots(bitstr: str):
-        assert len(bitstr) == 288
-        slots = []
-        for blk in range(9):
-            val = 0
-            for i in range(32):
-                b = 1 if bitstr[blk*32 + i] == '1' else 0
-                val |= (b << i)
-            slots.append(val)
-        return slots
-
     data = [
         {"user_id": 1, "latitude": 37.50, "longitude": 127.00, "korean":0.5, "pizza":0.2, "chicken":0.3}, #1
         {"user_id": 2, "latitude": 37.51, "longitude": 127.01, "korean":0.6, "pizza":0, "chicken":0.4}, #2
